@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------
+   Travel OS theme tokens
+   Primary: Teal · Accent: Cyan · Semantic: success/warning/danger
+   Values are space-separated RGB so Tailwind can apply opacity.
+---------------------------------------------------------------- */
+:root, [data-theme='light'] {
+  --c-surface: 246 248 250;     /* app background */
+  --c-surface-2: 255 255 255;   /* cards */
+  --c-surface-3: 238 242 245;   /* inset areas */
+  --c-ink: 17 27 36;
+  --c-ink-2: 84 99 112;
+  --c-ink-3: 140 153 165;
+  --c-primary: 13 148 136;      /* teal-600 */
+  --c-primary-ink: 255 255 255;
+  --c-accent: 8 145 178;        /* cyan-600 */
+  --c-success: 22 163 74;
+  --c-warning: 217 119 6;
+  --c-danger: 220 38 38;
+  --c-line: 226 232 236;
+  --c-transit: 250 244 229;      /* soft beige card bg */
+  --c-transit-line: 233 221 194;
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  --c-surface: 11 18 32;
+  --c-surface-2: 20 29 45;
+  --c-surface-3: 28 39 58;
+  --c-ink: 236 242 247;
+  --c-ink-2: 156 172 186;
+  --c-ink-3: 108 124 140;
+  --c-primary: 45 212 191;      /* teal-400: brighter on dark */
+  --c-primary-ink: 8 24 22;
+  --c-accent: 34 211 238;
+  --c-success: 74 222 128;
+  --c-warning: 251 191 36;
+  --c-danger: 248 113 113;
+  --c-line: 40 53 72;
+  --c-transit: 45 40 30;         /* warm dark equivalent */
+  --c-transit-line: 74 64 44;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body {
+  @apply bg-surface text-ink antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+    'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  overscroll-behavior-y: none;
+}
+
+/* Safe-area helpers for iPhone notch / home indicator */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+.card { @apply bg-surface-2 rounded-card shadow-card border border-line/60; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+@media print {
+  html, body, #root { height: auto !important; }
+  main { overflow: visible !important; height: auto !important; }
+  body { background: white !important; color: black !important; }
+}
