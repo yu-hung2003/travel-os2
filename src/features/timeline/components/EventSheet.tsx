@@ -155,7 +155,7 @@ export function EventSheet({ event, days, dayEvents = [], onClose }: Props) {
             )}
             {event.status !== 'scheduled' && (
               <button className={actionBtn} onClick={() => setStatus('scheduled')}>
-                ↩️ 恢復排程
+                {event.status === 'completed' ? '↩️ 取消完成' : '↩️ 恢復排程(重新排入)'}
               </button>
             )}
             <button className={actionBtn} onClick={() => setView('move')}>

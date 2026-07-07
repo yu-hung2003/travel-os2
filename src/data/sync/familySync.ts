@@ -17,13 +17,14 @@ import { getFirestoreDb, isFirebaseConfigured } from '@/data/sync/firebase';
 
 const SYNC_TABLES = [
   'trips', 'days', 'dayVersions', 'events', 'expenses',
-  'packing', 'accommodations', 'transfers', 'places', 'shopping',
+  'packing', 'accommodations', 'transfers', 'places', 'shopping', 'photos',
 ] as const;
 type SyncTable = (typeof SYNC_TABLES)[number];
 
 const MAP_KEY = 'travelos2-sync-rooms';   // { [tripId]: code }
 const CLIENT_KEY = 'travelos2-client-id';
 const LAST_RX_KEY = 'travelos2-sync-last-rx';
+const LAST_APPLY_KEY = 'travelos2-sync-last-apply';
 
 function clientId(): string {
   let id = localStorage.getItem(CLIENT_KEY);
@@ -137,6 +138,7 @@ function startListener(code: string): void {
           if (!SYNC_TABLES.includes(d.table)) continue;
           if (d.deleted) await db.table(d.table).delete(d.key);
           else if (d.data) await db.table(d.table).put(d.data);
+          localStorage.setItem(LAST_APPLY_KEY, String(Date.now()));
         }
       } catch (e) {
         console.warn('[sync] apply failed', e);
@@ -198,6 +200,7 @@ export async function createRoom(tripId: string): Promise<string> {
   saveMap(map);
   installHooks();
   startListener(code);
+  void touchPresence(code);
   return code;
 }
 
@@ -249,6 +252,7 @@ export function linkRoom(code: string, tripId: string): void {
   saveMap(map);
   installHooks();
   startListener(code);
+  void touchPresence(code);
 }
 
 /** Stop syncing one trip on this device; local data stays intact. */
@@ -270,8 +274,76 @@ export function resumeSyncIfEnabled(): void {
   if (codes.length === 0 || !isFirebaseConfigured()) return;
   try {
     installHooks();
-    for (const code of codes) startListener(code);
+    for (const code of codes) {
+      startListener(code);
+      void touchPresence(code);
+    }
   } catch (e) {
     console.warn('[sync] resume failed', e);
   }
+}
+
+export function getLastAppliedAt(): number | null {
+  const v = localStorage.getItem(LAST_APPLY_KEY);
+  return v ? Number(v) : null;
+}
+
+/** leave a presence mark on the room doc (no rules change needed) */
+async function touchPresence(code: string): Promise<void> {
+  try {
+    const fs = getFirestoreDb();
+    await setDoc(
+      doc(fs, 'rooms', code),
+      { members: { [clientId()]: { lastSeenAt: Date.now() } } },
+      { merge: true },
+    );
+  } catch { /* presence is best-effort */ }
+}
+
+/** how many devices have used this trip's sync code */
+export async function getMemberCount(tripId: string): Promise<number | null> {
+  const code = getRoomCode(tripId);
+  if (!code || !isFirebaseConfigured()) return null;
+  try {
+    const fs = getFirestoreDb();
+    const room = await getDoc(doc(fs, 'rooms', code));
+    const members = (room.data() as { members?: Record<string, unknown> } | undefined)?.members;
+    return members ? Object.keys(members).length : 1;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Force-sync one trip: fetch ALL its room records from the server and
+ * apply them, then rebuild the realtime listener. Guarantees convergence
+ * even if the push channel missed events.
+ */
+export async function forceSync(tripId: string): Promise<number> {
+  const code = getRoomCode(tripId);
+  if (!code || !isFirebaseConfigured()) return 0;
+  const fs = getFirestoreDb();
+  const snap = await getDocs(collection(fs, 'rooms', code, 'records'));
+  let applied = 0;
+  applyingRemote = true;
+  try {
+    for (const d of snap.docs) {
+      const r = d.data() as {
+        table: SyncTable; key: string; data?: Record<string, unknown>; deleted?: boolean;
+      };
+      if (!SYNC_TABLES.includes(r.table)) continue;
+      if (r.deleted) await db.table(r.table).delete(r.key);
+      else if (r.data) await db.table(r.table).put(r.data);
+      applied += 1;
+    }
+  } finally {
+    applyingRemote = false;
+  }
+  localStorage.setItem(LAST_APPLY_KEY, String(Date.now()));
+  localStorage.setItem(LAST_RX_KEY, String(Date.now()));
+  listeners.get(code)?.();
+  listeners.delete(code);
+  startListener(code);
+  void touchPresence(code);
+  return applied;
 }

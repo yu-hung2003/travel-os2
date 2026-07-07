@@ -152,6 +152,7 @@ export const eventRepository = {
     type: EventType;
     title: string;
     durationMin?: number;
+    fixedStart?: string;
     note?: string;
     alert?: string;
   }): Promise<void> {
@@ -170,6 +171,7 @@ export const eventRepository = {
         type: input.type,
         title: input.title.trim(),
         durationMin: input.durationMin,
+        fixedStart: input.fixedStart || undefined,
         note: input.note?.trim() || undefined,
         alert: input.alert?.trim() || undefined,
         status: 'scheduled',

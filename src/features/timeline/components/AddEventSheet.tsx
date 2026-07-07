@@ -15,6 +15,8 @@ export function AddEventSheet({ open, tripId, dayId, onClose }: Props) {
   const [type, setType] = useState<EventType>('sight');
   const [title, setTitle] = useState('');
   const [durText, setDurText] = useState('');
+  const [fixedStart, setFixedStart] = useState('');
+  const [fixedEnd, setFixedEnd] = useState('');
   const [alertText, setAlertText] = useState('');
 
   const reset = () => {
@@ -94,6 +96,38 @@ export function AddEventSheet({ open, tripId, dayId, onClose }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="rounded-xl bg-surface-3 p-3">
+          <p className="text-xs font-semibold text-ink-2">
+            🔒 指定時段(選填)— 有預約/預訂的行程直接填實際時間;留空則自動接續前一行程
+          </p>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] font-semibold text-ink-3" htmlFor="new-fs">開始</label>
+              <input
+                id="new-fs" type="time" value={fixedStart}
+                onChange={(e) => setFixedStart(e.target.value)}
+                className="mt-0.5 w-full rounded-xl border border-line bg-surface p-2.5 text-sm outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-ink-3" htmlFor="new-fe">結束(選填,自動算停留)</label>
+              <input
+                id="new-fe" type="time" value={fixedEnd}
+                onChange={(e) => setFixedEnd(e.target.value)}
+                className="mt-0.5 w-full rounded-xl border border-line bg-surface p-2.5 text-sm outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          {fixedStart && (
+            <button
+              className="mt-2 text-xs font-semibold text-danger active:opacity-70"
+              onClick={() => { setFixedStart(''); setFixedEnd(''); }}
+            >
+              ✕ 清除指定時段
+            </button>
+          )}
         </div>
 
         <div>
