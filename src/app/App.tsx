@@ -22,6 +22,8 @@ const PlacesPage = lazy(() => import('@/features/places/PlacesPage'));
 const ShoppingPage = lazy(() => import('@/features/shopping/ShoppingPage'));
 const EmergencyPage = lazy(() => import('@/features/emergency/EmergencyPage'));
 const PrintPage = lazy(() => import('@/features/print/PrintPage'));
+const PhrasesPage = lazy(() => import('@/features/phrases/PhrasesPage'));
+const SummaryPage = lazy(() => import('@/features/summary/SummaryPage'));
 
 const fallback = (
   <div className="flex h-full items-center justify-center text-ink-3">載入中…</div>
@@ -102,6 +104,8 @@ const router = createBrowserRouter([
       { path: 'shopping', element: <ShoppingPage /> },
       { path: 'emergency', element: <EmergencyPage /> },
       { path: 'print', element: <PrintPage /> },
+      { path: 'phrases', element: <PhrasesPage /> },
+      { path: 'summary', element: <SummaryPage /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

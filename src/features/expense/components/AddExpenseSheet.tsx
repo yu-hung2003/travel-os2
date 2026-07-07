@@ -24,6 +24,7 @@ export function AddExpenseSheet({ open, tripId, days, travelers, onClose }: Prop
   const [note, setNote] = useState('');
   const [dayId, setDayId] = useState<string>(todayDay?.id ?? NO_DAY);
   const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [payerId, setPayerId] = useState<string | null>(null);
 
   const toggleMember = (id: string) => {
     setMemberIds((cur) =>
@@ -43,10 +44,12 @@ export function AddExpenseSheet({ open, tripId, days, travelers, onClose }: Prop
       amount: Math.round(amount),
       note,
       memberIds,
+      payerId: payerId ?? undefined,
     });
     setAmountText('');
     setNote('');
     setMemberIds([]);
+    setPayerId(null);
     onClose();
   };
 
@@ -128,6 +131,26 @@ export function AddExpenseSheet({ open, tripId, days, travelers, onClose }: Prop
                 }`}
               >
                 {t.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* payer: enables settlement in the trip summary */}
+        <div>
+          <p className="text-xs font-semibold text-ink-2">
+            付款人(選填 — 填了才能在旅程總結算「誰該給誰」)
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {travelers.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setPayerId(payerId === t.id ? null : t.id)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  payerId === t.id ? 'bg-primary text-primary-ink' : 'bg-surface-3 text-ink-2'
+                }`}
+              >
+                💳 {t.name}
               </button>
             ))}
           </div>

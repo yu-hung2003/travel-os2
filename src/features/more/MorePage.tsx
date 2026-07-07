@@ -6,7 +6,7 @@ import { CurrencyConverter } from '@/shared/components/CurrencyConverter';
 import { InstallCard } from '@/features/more/components/InstallCard';
 
 const ORDER_KEY = 'travelos2-more-order';
-const CARD_IDS = ['sync', 'info', 'places', 'packing', 'shopping', 'emergency', 'print', 'converter'] as const;
+const CARD_IDS = ['sync', 'summary', 'info', 'places', 'packing', 'shopping', 'phrases', 'emergency', 'print', 'converter'] as const;
 type CardId = (typeof CARD_IDS)[number];
 
 const cardLabels: Record<CardId, string> = {
@@ -18,6 +18,8 @@ const cardLabels: Record<CardId, string> = {
   emergency: '🆘 緊急資訊',
   print: '🖨️ 列印行程表',
   converter: '💱 匯率試算',
+  phrases: '🈺 溝通小卡',
+  summary: '🏁 旅程總結',
 };
 
 function loadOrder(): CardId[] {
@@ -90,6 +92,14 @@ export default function MorePage() {
     print: (
       <LinkCard to={`${base}/print`} title="🖨️ 列印行程表"
         desc="A4 全程行程表,列印或存 PDF 備援" />
+    ),
+    phrases: (
+      <LinkCard to={`${base}/phrases`} title="🈺 溝通小卡"
+        desc="常用日文句 + 自訂句,點了放大給店員看,離線可用" />
+    ),
+    summary: (
+      <LinkCard to={`${base}/summary`} title="🏁 旅程總結"
+        desc="花費統計、成員分帳結算、行程足跡、美食榜、日記——隨時可看" />
     ),
     converter: <CurrencyConverter />,
   };

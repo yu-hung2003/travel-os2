@@ -9,6 +9,7 @@ import { gmapsDirectionsUrl, gmapsSearchUrl } from '@/shared/utils/maps';
 import { WeatherCard } from '@/features/dashboard/components/WeatherCard';
 import { SmartSuggestions } from '@/features/dashboard/components/SmartSuggestions';
 import { CurrencyConverter } from '@/shared/components/CurrencyConverter';
+import { JournalCard } from '@/features/dashboard/components/JournalCard';
 import type { TimelineEvent, Trip, TripDay } from '@/domain/types';
 import { computeSchedule } from '@/domain/schedule';
 
@@ -245,6 +246,8 @@ export function TodayBoard({ trip, day, now, preview = false }: Props) {
           </ul>
         </section>
       )}
+
+      {!preview && <JournalCard day={day} />}
 
       <CurrencyConverter compact />
 

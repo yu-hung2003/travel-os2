@@ -10,6 +10,7 @@ export const expenseRepository = {
     amount: number;
     note?: string;
     memberIds?: string[];
+    payerId?: string;
   }): Promise<void> {
     const expense: Expense = {
       id: newId(),

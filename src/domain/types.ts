@@ -208,6 +208,8 @@ export interface Expense {
   amountHome?: number;       // converted, optional
   /** tagged members; empty/undefined = shared by everyone */
   memberIds?: ID[];
+  /** who paid — enables settlement in the trip summary (optional) */
+  payerId?: ID;
   /** @deprecated superseded by memberIds (kept for v1 data) */
   paidBy?: ID;
   note?: string;
@@ -219,7 +221,8 @@ export interface JournalEntry {
   tripId: ID;
   dayId: ID;
   text: string;
-  photos: Blob[];
+  /** unused — kept optional so entries stay JSON-serializable for sync */
+  photos?: Blob[];
   createdAt: number;
   updatedAt: number;
 }
@@ -290,4 +293,22 @@ export interface ShoppingPhoto {
   itemId: ID;
   dataUrl: string;           // compressed JPEG data URL
   createdAt: number;
+}
+
+/** flight info for pre-departure reminders */
+export interface Flight {
+  id: ID;
+  tripId: ID;
+  kind: 'outbound' | 'return';
+  flightNo: string;          // e.g. 'IT220'
+  airline?: string;
+  depAirport?: string;       // e.g. 'TPE T1'
+  arrAirport?: string;       // e.g. 'KIX T1'
+  /** local datetime 'yyyy-MM-ddTHH:mm' */
+  depTime: string;
+  arrTime?: string;
+  note?: string;
+  /** per-reminder opt-in checkboxes */
+  remindCheckIn: boolean;    // T-24h 線上報到
+  remindDepart: boolean;     // T-3h 出發去機場
 }

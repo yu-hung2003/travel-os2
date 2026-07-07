@@ -6,6 +6,8 @@ import { tripRepository } from '@/data/repositories/tripRepository';
 import { useNow } from '@/features/dashboard/useNow';
 import { TodayBoard } from '@/features/dashboard/components/TodayBoard';
 import { PackingReminderCard } from '@/features/dashboard/components/PackingReminderCard';
+import { FlightCard } from '@/features/dashboard/components/FlightCard';
+import { DocsChecklistCard } from '@/features/dashboard/components/DocsChecklistCard';
 
 
 export default function DashboardPage() {
@@ -32,11 +34,18 @@ export default function DashboardPage() {
       </header>
 
       {/* during the trip */}
+      {today && todayIso === trip.endDate && (
+        <FlightCard trip={trip} kind="return" now={now.getTime()} />
+      )}
       {today && <TodayBoard trip={trip} day={today} now={now} />}
 
       {/* before the trip: countdown + preview */}
       {beforeTrip && (
         <>
+          <FlightCard trip={trip} kind="outbound" now={now.getTime()} />
+          {differenceInCalendarDays(parseISO(trip.startDate), parseISO(todayIso)) <= 7 && (
+            <DocsChecklistCard tripId={trip.id} />
+          )}
           {differenceInCalendarDays(parseISO(trip.startDate), parseISO(todayIso)) <= 3 && (
             <PackingReminderCard trip={trip} />
           )}
@@ -65,8 +74,14 @@ export default function DashboardPage() {
         <section className="card p-5">
           <p className="text-lg font-bold">{trip.coverEmoji} {trip.title} 已圓滿結束</p>
           <p className="mt-1 text-sm text-ink-2">
-            到旅程頁回顧行程,或準備下一趟冒險。
+            打開旅程總結,看看這趟的完整回顧與分帳結算。
           </p>
+          <Link
+            to={`/t/${trip.id}/summary`}
+            className="mt-3 block rounded-xl bg-primary py-3 text-center text-sm font-bold text-primary-ink active:opacity-80"
+          >
+            🏁 查看旅程總結
+          </Link>
         </section>
       )}
     </div>
