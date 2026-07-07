@@ -106,6 +106,66 @@ export const eventRepository = {
     await db.events.update(eventId, { ...patch, updatedAt: Date.now() });
   },
 
+  /**
+   * Create or update a pinned event from flight/transfer info (帶入行程).
+   * position 'start' places it before all events of the day's active version.
+   */
+  async upsertPinnedEvent(input: {
+    existingId?: string;
+    tripId: string;
+    dayId: string;
+    type: EventType;
+    title: string;
+    fixedStart: string;
+    durationMin?: number;
+    note?: string;
+    transit?: TransitInfo;
+    position: 'start' | 'end';
+  }): Promise<string> {
+    return db.transaction('rw', [db.events, db.days], async () => {
+      if (input.existingId) {
+        const existing = await db.events.get(input.existingId);
+        if (existing) {
+          await db.events.update(input.existingId, {
+            title: input.title,
+            fixedStart: input.fixedStart,
+            durationMin: input.durationMin,
+            note: input.note?.trim() || undefined,
+            transit: input.transit,
+            updatedAt: Date.now(),
+          });
+          return input.existingId;
+        }
+      }
+      const day = await db.days.get(input.dayId);
+      const versionId = day?.activeVersionId;
+      const siblings = (await db.events.where('dayId').equals(input.dayId).toArray())
+        .filter((e) => !versionId || (e.versionId ?? '') === versionId);
+      const order = input.position === 'start'
+        ? Math.min(0, ...siblings.map((e) => e.order)) - 1
+        : siblings.reduce((m, e) => Math.max(m, e.order), 0) + 1;
+      const id = newId();
+      await db.events.add({
+        id,
+        tripId: input.tripId,
+        dayId: input.dayId,
+        versionId,
+        order,
+        type: input.type,
+        title: input.title,
+        fixedStart: input.fixedStart,
+        durationMin: input.durationMin,
+        note: input.note?.trim() || undefined,
+        transit: input.transit,
+        status: 'scheduled',
+        isFavorite: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return id;
+    });
+  },
+
   /** mark a transport card's route as confirmed for its current neighbors */
   async confirmNeighborSig(eventId: string, sig: string): Promise<void> {
     await db.events.update(eventId, { neighborSig: sig, updatedAt: Date.now() });

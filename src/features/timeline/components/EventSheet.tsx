@@ -4,6 +4,7 @@ import { eventRepository } from '@/data/repositories/eventRepository';
 import { BottomSheet } from '@/shared/components/BottomSheet';
 import { typeMeta } from '@/features/timeline/eventMeta';
 import { gmapsDirectionsUrl, parseCoords } from '@/shared/utils/maps';
+import { format } from 'date-fns';
 import type { TransitInfo } from '@/domain/types';
 
 interface Props {
@@ -191,6 +192,19 @@ export function EventSheet({ event, days, dayEvents = [], onClose }: Props) {
               >
                 🚏 導航此段(A→B)
               </a>
+            )}
+            {event.status === 'scheduled' && (
+              <button
+                className={actionBtn}
+                onClick={async () => {
+                  // delay recovery: pin this event to right now; everything
+                  // after it reflows from its new end time automatically
+                  await eventRepository.updateFixedStart(event.id, format(new Date(), 'HH:mm'));
+                  onClose();
+                }}
+              >
+                ▶️ 從現在開始(後續順延)
+              </button>
             )}
             <button className={actionBtn} onClick={() => setView('timing')}>
               ⏱ 停留/營業時間

@@ -29,15 +29,34 @@ export function FlightCard({ trip, kind, now }: { trip: Trip; kind: 'outbound' |
   return (
     <section className="card p-4">
       <p className="text-xs font-semibold text-ink-2">
-        ✈️ {kind === 'outbound' ? '去程航班' : '回程航班'} · {flight.flightNo}
-        {flight.airline ? ` ${flight.airline}` : ''}
+        ✈️ {kind === 'outbound' ? '去程航班' : '回程航班'}
+        {flight.airline ? ` · ${flight.airline}` : ''} · <span className="font-bold">{flight.flightNo}</span>
       </p>
-      <p className="mt-1 text-sm font-bold tabular-nums">
-        {format(parseISO(flight.depTime), 'M/d HH:mm')} {flight.depAirport ?? ''}
-        {' → '}
-        {flight.arrTime ? `${format(parseISO(flight.arrTime), 'HH:mm')} ` : ''}
-        {flight.arrAirport ?? ''}
-      </p>
+      <div className="mt-1.5 space-y-0.5 text-sm tabular-nums">
+        <p>
+          <span className="mr-1">🛫</span>
+          <span className="font-bold">{format(parseISO(flight.depTime), 'M/d(EEE) HH:mm')}</span>
+          {flight.depAirport && <span className="ml-1.5 font-semibold text-ink-2">{flight.depAirport}</span>}
+        </p>
+        {(flight.arrTime || flight.arrAirport) && (
+          <p>
+            <span className="mr-1">🛬</span>
+            {flight.arrTime && (
+              <span className="font-bold">{format(parseISO(flight.arrTime), 'M/d(EEE) HH:mm')}</span>
+            )}
+            {flight.arrAirport && <span className="ml-1.5 font-semibold text-ink-2">{flight.arrAirport}</span>}
+            {flight.arrTime && (() => {
+              const mins = (parseISO(flight.arrTime).getTime() - parseISO(flight.depTime).getTime()) / 60000;
+              if (mins <= 0 || mins >= 24 * 60) return null;
+              return (
+                <span className="ml-1.5 text-xs text-ink-3">
+                  (飛行約 {Math.floor(mins / 60)} 時 {Math.round(mins % 60)} 分)
+                </span>
+              );
+            })()}
+          </p>
+        )}
+      </div>
       {untilDep > 0 && (
         <p className="mt-0.5 text-xs tabular-nums text-ink-2">距離起飛 {fmtCountdown(untilDep)}</p>
       )}

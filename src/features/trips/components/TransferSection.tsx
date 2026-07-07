@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { transferRepository, type TransferInput } from '@/data/repositories/transferRepository';
+import { eventRepository } from '@/data/repositories/eventRepository';
+import { tripRepository } from '@/data/repositories/tripRepository';
+import { db } from '@/data/db';
 import { BottomSheet } from '@/shared/components/BottomSheet';
 import type { Transfer } from '@/domain/types';
 
@@ -16,6 +19,41 @@ export function TransferSection({ tripId }: Props) {
   const [editing, setEditing] = useState<Transfer | 'new' | null>(null);
   const [form, setForm] = useState<TransferInput>({ ...EMPTY, tripId });
   const [amountText, setAmountText] = useState('');
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
+  const importToItinerary = async (t: Transfer) => {
+    if (!t.datetime) {
+      setImportMsg('⚠️ 此接送未填日期時間,請先編輯補上再帶入。');
+      setTimeout(() => setImportMsg(null), 3000);
+      return;
+    }
+    const days = await tripRepository.listDays(tripId);
+    const day = days.find((d) => d.date === t.datetime!.slice(0, 10));
+    if (!day) {
+      setImportMsg(`⚠️ 日期 ${t.datetime.slice(0, 10)} 不在旅程日期內,無法帶入。`);
+      setTimeout(() => setImportMsg(null), 3000);
+      return;
+    }
+    const eventId = await eventRepository.upsertPinnedEvent({
+      existingId: t.linkedEventId,
+      tripId,
+      dayId: day.id,
+      type: 'transport',
+      title: `🚐 ${t.title}`,
+      fixedStart: t.datetime.slice(11, 16),
+      durationMin: 90,
+      note: [
+        t.contactName ? `司機/聯絡:${t.contactName}` : undefined,
+        t.contactPhone,
+        t.note,
+      ].filter(Boolean).join(' · ') || undefined,
+      transit: { mode: 'taxi' },
+      position: 'start',
+    });
+    await db.transfers.update(t.id, { linkedEventId: eventId });
+    setImportMsg(`✅ 已帶入 Day ${day.dayIndex} 行程(預設停留 90 分,可再調整)`);
+    setTimeout(() => setImportMsg(null), 3000);
+  };
 
   useEffect(() => {
     if (editing === 'new') {
@@ -93,6 +131,12 @@ export function TransferSection({ tripId }: Props) {
                 )}
                 {t.note && <p className="mt-0.5 text-xs text-ink-3">{t.note}</p>}
               </button>
+              <button
+                onClick={() => importToItinerary(t)}
+                className="mt-1.5 w-full rounded-xl bg-primary/10 py-2 text-xs font-bold text-primary active:opacity-70"
+              >
+                {t.linkedEventId ? '🔁 更新行程中的接送卡' : '📥 帶入行程(免再輸入)'}
+              </button>
               {(t.contactName || t.contactPhone) && (
                 <p className="mt-1 text-xs text-ink-2">
                   聯絡:{t.contactName ?? ''}
@@ -107,6 +151,7 @@ export function TransferSection({ tripId }: Props) {
           ))}
         </ul>
       )}
+      {importMsg && <p className="mt-2 text-xs font-semibold text-success">{importMsg}</p>}
 
       <BottomSheet
         open={editing !== null}

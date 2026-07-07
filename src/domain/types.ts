@@ -146,6 +146,8 @@ export interface Transfer {
   contactName?: string;
   contactPhone?: string;
   note?: string;
+  /** timeline event created from this transfer (帶入行程) */
+  linkedEventId?: ID;
   createdAt: number;
   updatedAt: number;
 }
@@ -311,4 +313,6 @@ export interface Flight {
   /** per-reminder opt-in checkboxes */
   remindCheckIn: boolean;    // T-24h 線上報到
   remindDepart: boolean;     // T-3h 出發去機場
+  /** timeline event created from this flight (帶入行程) */
+  linkedEventId?: ID;
 }

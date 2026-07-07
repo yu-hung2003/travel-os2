@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import { tripRepository } from '@/data/repositories/tripRepository';
 import { placeRepository } from '@/data/repositories/placeRepository';
 import { typeMeta } from '@/features/timeline/eventMeta';
-import { gmapsDirectionsUrl, parseCoords, parseGoogleMapsUrl } from '@/shared/utils/maps';
+import { distanceKm, gmapsDirectionsUrl, parseCoords, parseGoogleMapsUrl } from '@/shared/utils/maps';
 import { eventRepository } from '@/data/repositories/eventRepository';
 import { BottomSheet } from '@/shared/components/BottomSheet';
 import { useOnline } from '@/shared/hooks/useOnline';
@@ -32,6 +32,7 @@ interface InventoryRow {
   source: 'event' | 'acc' | 'place';
   rawId: string;
   dayId?: string; // events: jump target
+  point?: GeoPoint;
 }
 
 function emojiIcon(emoji: string): L.DivIcon {
@@ -48,6 +49,14 @@ function emojiIcon(emoji: string): L.DivIcon {
     iconAnchor: [17, 17],
     popupAnchor: [0, -18],
   });
+}
+
+function FlyToMe({ point }: { point: GeoPoint | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (point) map.flyTo([point.lat, point.lng], Math.max(map.getZoom(), 13));
+  }, [point, map]);
+  return null;
 }
 
 function FitBounds({ pins }: { pins: Pin[] }) {
@@ -67,6 +76,42 @@ export default function MapPage() {
 
   const [showList, setShowList] = useState(false);
   const [editingRow, setEditingRow] = useState<InventoryRow | null>(null);
+  const [routeMode, setRouteMode] = useState(false);
+  const [routeSel, setRouteSel] = useState<string[]>([]); // inventory row ids, ordered
+  const [myLocation, setMyLocation] = useState<GeoPoint | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [geoMsg, setGeoMsg] = useState<string | null>(null);
+
+  const locate = () => {
+    if (!('geolocation' in navigator)) {
+      setGeoMsg('此裝置/瀏覽器不支援定位。');
+      return;
+    }
+    setLocating(true);
+    setGeoMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMyLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        setGeoMsg(
+          err.code === 1
+            ? '定位權限被拒。iPhone:設定 → 隱私權 → 定位服務 → Safari 網站 設為「使用 App 期間」。'
+            : '暫時無法取得位置,請到訊號較好的地方再試。',
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60_000 },
+    );
+  };
+
+  const myIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 0 0 6px rgba(37,99,235,.25)"></div>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
   const [coordInput, setCoordInput] = useState('');
   const [coordMsg, setCoordMsg] = useState<string | null>(null);
 
@@ -124,6 +169,7 @@ export default function MapPage() {
         source: 'event',
         rawId: e.id,
         dayId: e.dayId,
+        point: e.location ?? undefined,
       });
       if (e.location) {
         out.push({
@@ -145,6 +191,7 @@ export default function MapPage() {
         hint: '貼上座標或 Google Maps 連結即可',
         source: 'acc',
         rawId: a.id,
+        point: a.location ?? undefined,
       });
       if (a.location) {
         out.push({ id: `acc-${a.id}`, point: a.location, emoji: '🏨', title: a.name, subtitle: '住宿' });
@@ -161,6 +208,7 @@ export default function MapPage() {
         hint: '貼上座標或 Google Maps 連結即可',
         source: 'place',
         rawId: p.id,
+        point: p.location ?? undefined,
       });
       if (p.location) {
         out.push({
@@ -177,6 +225,29 @@ export default function MapPage() {
 
   if (!trip || !data) return null;
   const { pins, inventory } = data;
+
+  const selRows = routeSel
+    .map((id) => inventory.find((r) => r.id === id))
+    .filter((r): r is InventoryRow => Boolean(r?.point));
+
+  const routeUrl = (mode: 'transit' | 'walking' | 'driving'): string => {
+    const pts = selRows.map((r) => `${r.point!.lat},${r.point!.lng}`);
+    const params = new URLSearchParams({
+      api: '1',
+      origin: pts[0],
+      destination: pts[pts.length - 1],
+      travelmode: mode,
+    });
+    const way = pts.slice(1, -1);
+    if (way.length > 0) params.set('waypoints', way.join('|'));
+    return `https://www.google.com/maps/dir/?${params.toString()}`;
+  };
+
+  const toggleRouteSel = (r: InventoryRow) => {
+    if (!r.point) return;
+    setRouteSel((cur) =>
+      cur.includes(r.id) ? cur.filter((x) => x !== r.id) : [...cur, r.id]);
+  };
   const missing = inventory.filter((r) => !r.hasCoords);
 
   return (
@@ -204,6 +275,12 @@ export default function MapPage() {
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitBounds pins={pins} />
+          <FlyToMe point={myLocation} />
+          {myLocation && (
+            <Marker position={[myLocation.lat, myLocation.lng]} icon={myIcon} zIndexOffset={1000}>
+              <Popup>📍 我的位置</Popup>
+            </Marker>
+          )}
           {pins.map((p) => (
             <Marker key={p.id} position={[p.point.lat, p.point.lng]} icon={emojiIcon(p.emoji)}>
               <Popup>
@@ -227,6 +304,16 @@ export default function MapPage() {
         </MapContainer>
       </div>
 
+      <div className="grid grid-cols-[auto_1fr_auto] gap-2">
+      <button
+        onClick={locate}
+        disabled={locating}
+        className={`rounded-2xl px-3.5 py-3 text-sm font-bold disabled:opacity-50 ${
+          myLocation ? 'bg-primary text-primary-ink' : 'border border-line/60 bg-surface-2 text-ink-2'
+        } active:opacity-70`}
+      >
+        {locating ? '…' : '📍'}
+      </button>
       <button
         onClick={() => setShowList(!showList)}
         className="rounded-2xl border border-line/60 bg-surface-2 py-3 text-sm font-semibold text-ink-2 active:bg-surface-3"
@@ -237,6 +324,70 @@ export default function MapPage() {
         )}
         <span className="ml-1.5 text-ink-3">{showList ? '▲ 收合' : '▼ 展開'}</span>
       </button>
+      <button
+        onClick={() => {
+          const next = !routeMode;
+          setRouteMode(next);
+          if (next) setShowList(true);
+          else setRouteSel([]);
+        }}
+        className={`rounded-2xl px-4 py-3 text-sm font-bold ${
+          routeMode ? 'bg-accent text-white' : 'border border-line/60 bg-surface-2 text-ink-2'
+        } active:opacity-70`}
+      >
+        🧭 規劃路線
+      </button>
+      </div>
+
+      {geoMsg && (
+        <p className="rounded-xl bg-warning/10 px-3 py-2 text-xs font-semibold leading-relaxed text-warning">
+          📍 {geoMsg}
+        </p>
+      )}
+
+      {routeMode && (
+        <section className="card p-4">
+          <p className="text-xs font-semibold text-ink-2">
+            依「經過順序」點選下方清單中的地點(2 點以上),再選交通方式開啟 Google Maps。
+          </p>
+          {selRows.length > 0 && (
+            <p className="mt-1.5 text-xs text-ink-2">
+              路線:{selRows.map((r, i) => `${i + 1}.${r.title}`).join(' → ')}
+            </p>
+          )}
+          <div className="mt-2 flex gap-2">
+            {([
+              ['transit', '🚃 大眾運輸'],
+              ['walking', '🚶 步行'],
+              ['driving', '🚗 開車'],
+            ] as const).map(([mode, label]) => {
+              const disabled =
+                selRows.length < 2 || (mode === 'transit' && selRows.length > 2);
+              return (
+                <a
+                  key={mode}
+                  href={disabled ? undefined : routeUrl(mode)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-disabled={disabled}
+                  className={`flex-1 rounded-xl py-2.5 text-center text-xs font-bold ${
+                    disabled
+                      ? 'pointer-events-none bg-surface-3 text-ink-3 opacity-50'
+                      : 'bg-primary text-primary-ink active:opacity-80'
+                  }`}
+                >
+                  {label}
+                </a>
+              );
+            })}
+          </div>
+          {selRows.length > 2 && (
+            <p className="mt-1.5 text-[11px] text-warning">
+              Google Maps 的多點路線(3 點以上)僅支援步行/開車;大眾運輸請兩點兩點查。
+            </p>
+          )}
+        </section>
+      )}
 
       {showList && (
         <section className="card p-4">
@@ -248,17 +399,44 @@ export default function MapPage() {
             {[...inventory].sort((a, b) => Number(a.hasCoords) - Number(b.hasCoords)).map((r) => (
               <li key={r.id}>
                 <button
-                  className="flex w-full items-start gap-3 py-2.5 text-left active:opacity-70"
+                  className={`flex w-full items-start gap-3 py-2.5 text-left active:opacity-70 ${
+                    routeMode && !r.point ? 'opacity-40' : ''
+                  }`}
                   onClick={() => {
+                    if (routeMode) {
+                      toggleRouteSel(r);
+                      return;
+                    }
                     setEditingRow(r);
                     setCoordInput('');
                     setCoordMsg(null);
                   }}
                 >
+                  {routeMode && (
+                    <span
+                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        routeSel.includes(r.id)
+                          ? 'bg-accent text-white'
+                          : 'border-2 border-line text-transparent'
+                      }`}
+                    >
+                      {routeSel.includes(r.id) ? routeSel.indexOf(r.id) + 1 : '·'}
+                    </span>
+                  )}
                   <span className="text-lg">{r.emoji}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold leading-snug">{r.title}</span>
-                    <span className="block text-xs text-ink-3">{r.subtitle}</span>
+                    <span className="block text-xs text-ink-3">
+                      {r.subtitle}
+                      {myLocation && r.point && (() => {
+                        const d = distanceKm(myLocation, r.point);
+                        return (
+                          <span className="ml-1.5 font-semibold text-accent">
+                            📍 {d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`}
+                          </span>
+                        );
+                      })()}
+                    </span>
                     {!r.hasCoords && (
                       <span className="mt-0.5 block text-xs text-warning">點擊補座標:{r.hint}</span>
                     )}
