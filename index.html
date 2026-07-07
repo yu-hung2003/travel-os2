@@ -1,27 +1,18 @@
-<!doctype html>
-<html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Travel OS" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0d9488" />
-    <title>Travel OS 2</title>
-    <script>
-      // Apply theme before first paint to avoid flash
-      (function () {
-        try {
-          var pref = localStorage.getItem('travelos-theme') || 'auto';
-          var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-        } catch (e) {}
-      })();
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+import type { ExpenseCategory } from '@/domain/types';
+
+export const categoryMeta: Record<ExpenseCategory, { emoji: string; label: string }> = {
+  breakfast: { emoji: '🍳', label: '早餐' },
+  lunch: { emoji: '🍜', label: '午餐' },
+  dinner: { emoji: '🍽️', label: '晚餐' },
+  coffee: { emoji: '☕', label: '咖啡' },
+  transport: { emoji: '🚃', label: '交通' },
+  ticket: { emoji: '🎫', label: '門票' },
+  shopping: { emoji: '🛍️', label: '購物' },
+  snack: { emoji: '🍡', label: '零食' },
+  other: { emoji: '📦', label: '其他' },
+};
+
+export const categoryOrder: ExpenseCategory[] = [
+  'breakfast', 'lunch', 'dinner', 'coffee', 'transport',
+  'ticket', 'shopping', 'snack', 'other',
+];
