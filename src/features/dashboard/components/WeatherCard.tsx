@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BottomSheet } from '@/shared/components/BottomSheet';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
 import { db } from '@/data/db';
@@ -6,6 +7,36 @@ import { getWeather, type WeatherSnapshot } from '@/data/sync/weatherService';
 import type { GeoPoint, TripDay } from '@/domain/types';
 
 const FALLBACK_OSAKA: GeoPoint = { lat: 34.6937, lng: 135.5023 };
+const OVERRIDE_KEY = 'travelos2-weather-override'; // {label, lat, lng} | absent = auto
+
+interface Override { label: string; lat: number; lng: number }
+
+function loadOverride(): Override | null {
+  try {
+    const raw = localStorage.getItem(OVERRIDE_KEY);
+    return raw ? (JSON.parse(raw) as Override) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** candidate locations for the picker: accommodations + today's located events */
+async function listCandidates(day: TripDay): Promise<Override[]> {
+  const out: Override[] = [];
+  const seen = new Set<string>();
+  const push = (label: string, p?: GeoPoint) => {
+    if (!p) return;
+    const k = `${p.lat.toFixed(3)},${p.lng.toFixed(3)}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ label, lat: p.lat, lng: p.lng });
+  };
+  const accs = await db.accommodations.where('tripId').equals(day.tripId).toArray();
+  for (const a of accs) push(`🏨 ${a.name}`, a.location);
+  const evs = await db.events.where('dayId').equals(day.id).sortBy('order');
+  for (const e of evs) push(e.placeName ?? e.title, e.location);
+  return out;
+}
 
 interface WeatherPoint {
   point: GeoPoint;
@@ -49,7 +80,16 @@ function msnWeatherUrl(p: GeoPoint): string {
 }
 
 export function WeatherCard({ day }: { day: TripDay }) {
-  const resolved = useLiveQuery(() => resolvePoint(day), [day.id]);
+  const [override, setOverride] = useState<Override | null>(loadOverride());
+  const [picking, setPicking] = useState(false);
+  const auto = useLiveQuery(() => resolvePoint(day), [day.id]);
+  const candidates = useLiveQuery(
+    () => (picking ? listCandidates(day) : Promise.resolve([] as Override[])),
+    [day.id, picking],
+  );
+  const resolved: WeatherPoint | undefined = override
+    ? { point: { lat: override.lat, lng: override.lng }, label: `${override.label}(固定)` }
+    : auto;
   const point = resolved?.point;
   const [snap, setSnap] = useState<WeatherSnapshot | null | 'loading'>('loading');
 
@@ -69,15 +109,28 @@ export function WeatherCard({ day }: { day: TripDay }) {
   const rain = snap !== 'loading' && snap !== null && snap.pop >= 0.6;
 
   return (
+    <>
     <a
       href={point ? msnWeatherUrl(point) : undefined}
       target="_blank"
       rel="noreferrer"
       className="card block p-4 active:opacity-80"
     >
-      <p className="truncate text-xs font-semibold text-ink-2">
-        今日天氣{resolved ? ` · ${resolved.label}` : ''}
-      </p>
+      <span className="flex items-center justify-between gap-1">
+        <p className="min-w-0 truncate text-xs font-semibold text-ink-2">
+          今日天氣{resolved ? ` · ${resolved.label}` : ''}
+        </p>
+        <button
+          className="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold text-ink-2 active:opacity-70"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setPicking(true);
+          }}
+        >
+          📍 切換
+        </button>
+      </span>
       {snap === 'loading' ? (
         <p className="mt-1.5 text-xl font-bold text-ink-3">…</p>
       ) : snap === null ? (
@@ -113,5 +166,46 @@ export function WeatherCard({ day }: { day: TripDay }) {
         </>
       )}
     </a>
+
+    <BottomSheet open={picking} onClose={() => setPicking(false)} title="天氣預報地點">
+      <div className="flex flex-col gap-2">
+        <p className="text-xs text-ink-3">
+          預設「自動」依當日行程判斷;臨時改去別區時可固定顯示指定地點的天氣(僅此裝置)。
+        </p>
+        <button
+          className={`rounded-xl p-3 text-left text-sm font-semibold ${
+            override === null ? 'bg-primary text-primary-ink' : 'bg-surface-3 text-ink-2'
+          }`}
+          onClick={() => {
+            localStorage.removeItem(OVERRIDE_KEY);
+            setOverride(null);
+            setPicking(false);
+          }}
+        >
+          🔄 自動(依當日行程)
+        </button>
+        {(candidates ?? []).map((c) => (
+          <button
+            key={`${c.lat}-${c.lng}`}
+            className={`rounded-xl p-3 text-left text-sm font-semibold ${
+              override && Math.abs(override.lat - c.lat) < 1e-6 && Math.abs(override.lng - c.lng) < 1e-6
+                ? 'bg-primary text-primary-ink'
+                : 'bg-surface-3 text-ink-2'
+            }`}
+            onClick={() => {
+              localStorage.setItem(OVERRIDE_KEY, JSON.stringify(c));
+              setOverride(c);
+              setPicking(false);
+            }}
+          >
+            {c.label}
+          </button>
+        ))}
+        {candidates && candidates.length === 0 && (
+          <p className="text-xs text-ink-3">目前沒有可選地點(行程/住宿需有座標)。</p>
+        )}
+      </div>
+    </BottomSheet>
+    </>
   );
 }

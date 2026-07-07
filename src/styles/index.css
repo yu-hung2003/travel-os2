@@ -67,3 +67,20 @@ body {
   main { overflow: visible !important; height: auto !important; }
   body { background: white !important; color: black !important; }
 }
+
+/* iOS Safari time/date input normalization — prevents collapsed/misaligned
+   fields (指定時段/營業時間 layout bug) */
+input[type='time'],
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  text-align: left;
+}
+input[type='time']::-webkit-date-and-time-value,
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
